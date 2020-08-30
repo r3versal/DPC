@@ -1,0 +1,148 @@
+@isTest
+private class RenewalOpportunityCreationTriggerTest {
+    
+    static testmethod void MainPositive(){
+
+		Opportunity opp = MiniDataFactory();
+        List<OpportunityLineItem> olis = [SELECT Id, UnitPrice, Discount, Quantity, OpportunityId
+                                         FROM OpportunityLineItem
+                                         WHERE OpportunityId =: opp.Id];
+        
+        opp.StageName = 'Closed Won';
+        update opp;
+        
+        Opportunity renewalOpp = [SELECT Id, Description, CloseDate, Name FROM Opportunity WHERE Type =: 'Renewal' 
+                                  ORDER BY CreatedDate DESC LIMIT 1];
+        
+        List<OpportunityLineItem> renewalOlis = [SELECT Id, UnitPrice, Discount, Quantity, OpportunityId
+                                         FROM OpportunityLineItem
+                                         WHERE OpportunityId =: renewalOpp.Id];
+        
+        system.assertEquals(renewalOpp.Description, opp.Description);
+        system.assertEquals(renewalOpp.Name, opp.Name);
+        system.assertEquals(renewalOlis.size(), olis.size());
+        system.assertEquals(renewalOpp.CloseDate, opp.CloseDate.addYears(1));
+        
+        for(OpportunityLineItem renewalOli: renewalOlis){
+            system.assertEquals(renewalOli.Discount, 0);
+        }
+    }
+    
+        static testmethod void MainNegative(){
+
+		Opportunity opp = MiniDataFactory();
+        List<OpportunityLineItem> olis = [SELECT Id, UnitPrice, Discount, Quantity, OpportunityId
+                                         FROM OpportunityLineItem
+                                         WHERE OpportunityId =: opp.Id];
+        
+        opp.StageName = 'Closed Won';
+        update opp;
+        
+        Opportunity renewalOpp = [SELECT Id, Description, CloseDate, Name FROM Opportunity WHERE Type =: 'Renewal' 
+                                  ORDER BY CreatedDate DESC LIMIT 1];
+        
+        List<OpportunityLineItem> renewalOlis = [SELECT Id, UnitPrice, Discount, Quantity, OpportunityId
+                                         FROM OpportunityLineItem
+                                         WHERE OpportunityId =: renewalOpp.Id];
+        
+        system.assertEquals(renewalOpp.Description, opp.Description);
+        system.assertEquals(renewalOpp.Name, opp.Name);
+        system.assertEquals(renewalOlis.size(), olis.size());
+        system.assertEquals(renewalOpp.CloseDate, opp.CloseDate.addYears(1));
+        
+        for(OpportunityLineItem renewalOli: renewalOlis){
+            system.assertEquals(renewalOli.Discount, 0);
+        }
+            
+       //Check negative use case
+        Opportunity oppNegative = new Opportunity();
+        oppNegative.Name = 'Test Opp';
+        oppNegative.CloseDate = System.today();
+        oppNegative.StageName = 'Prospecting';
+        oppNegative.Description = 'Here is my test description';
+        insert oppNegative;
+            
+        oppNegative.StageName = 'Closed Lost';
+        update oppNegative;
+            
+        Opportunity renewalOppNegative = [SELECT Id, Description, CloseDate, Name FROM Opportunity WHERE Type =: 'Renewal' 
+                                  ORDER BY CreatedDate DESC LIMIT 1];
+        //Confirm no Renewal Opportunity was created
+        system.assertEquals(renewalOpp.Id, renewalOppNegative.Id);
+    }
+    
+    static Opportunity MiniDataFactory(){
+        
+        ID standardPricebookID = Test.getStandardPricebookId();
+        Product2 product1 = new Product2(Name = 'Product1', IsActive = true);
+        insert product1;
+            
+        PricebookEntry sPricebookEntry1 = new PricebookEntry(Product2Id = product1.Id,
+                                                             Pricebook2Id = standardPricebookID,
+                                                             UnitPrice = 1,
+                                                             IsActive = true);
+        insert sPricebookEntry1;
+        Account a = new Account();
+        a.Name = 'Renewal Opp Test Account';
+        a.Description = 'Test Account for Renewal Opportunity Trigger';
+        insert a;
+        
+        Contact co = new Contact();
+        co.LastName = 'TestLastName';
+        insert co;
+        
+        Contract ca = new Contract();
+        ca.AccountId = a.Id;
+        insert ca;
+        
+        Campaign c = new Campaign();
+        c.Name = 'Test Campaign';
+        insert c;
+        
+        
+        Opportunity opp = new Opportunity();
+        opp.Name = 'Test Opp';
+        opp.CloseDate = System.today();
+        opp.StageName = 'Prospecting';
+        opp.CampaignId = c.Id;
+        opp.ContactId = co.Id;
+        opp.ContractId = ca.Id;
+        opp.LeadSource = 'Web';
+        opp.AccountId = a.Id;
+        opp.NextStep = 'Here are my next steps';
+        opp.IsPrivate = false;
+        opp.Probability = .3;
+        opp.Amount = 140;
+        opp.Description = 'Here is my test description';
+        insert opp;
+        
+        OpportunityLineItem oli = new OpportunityLineItem();
+        oli.OpportunityId = opp.Id;
+        oli.UnitPrice = 1.00;
+        oli.Quantity = 2;
+        oli.Description = 'Test Product Description';
+        oli.PricebookEntryId = sPricebookEntry1.Id;
+        oli.Product2Id = product1.Id;
+        insert oli;
+        
+        OpportunityLineItem oli1 = new OpportunityLineItem();
+        oli1.OpportunityId = opp.Id;
+        oli1.UnitPrice = 12.00;
+        oli1.Quantity = 7;
+        oli1.Discount = 1;
+        oli1.PricebookEntryId = sPricebookEntry1.Id;
+        oli1.Product2Id = product1.Id;
+        insert oli1;
+        
+        OpportunityLineItem oli2 = new OpportunityLineItem();
+        oli2.OpportunityId = opp.Id;
+        oli2.UnitPrice = 9.00;
+        oli2.Quantity = 1;
+        oli2.PricebookEntryId = sPricebookEntry1.Id;
+        oli2.Product2Id = product1.Id;
+        insert oli2;
+        
+        return opp;
+    }
+
+}

@@ -1,0 +1,125 @@
+trigger RenewalOpportunityCreationTrigger on Opportunity (after update) {
+
+    List<Opportunity> originalOppsOld = Trigger.old; 
+    Opportunity originalOppOld = originalOppsOld[0];
+    
+    List<Opportunity> originalOpps = Trigger.new; 
+    Opportunity originalOpp = originalOpps[0];
+	
+    //Compare before and after stage names
+    if(originalOppOld.StageName != 'Closed Won'&& originalOpp.StageName == 'Closed Won'){
+        Opportunity newOpp = new Opportunity();
+        Date newCloseDate = system.today().addYears(1);
+        if(originalOpp.CloseDate != null){
+            newCloseDate = originalOpp.CloseDate.addYears(1);
+        }
+     	List<String> stagePickList = getStageNames();
+         try{
+            //Create Renewal Opportunity
+            newOpp.StageName = stagePickList[0];
+            List<string> typeNames = getTypeNames();
+            newOpp.CloseDate = newCloseDate;
+            if(typeNames.contains('Renewal')){
+            	newOpp.Type = 'Renewal';
+            }
+            if(originalOpp.Name != null){
+            	newOpp.Name = originalOpp.Name;
+            }
+            if(originalOpp.AccountId != null){
+                newOpp.AccountId = originalOpp.AccountId;
+            }
+            if(originalOpp.Amount != null){
+                newOpp.Amount = originalOpp.Amount;
+            }
+            if(originalOpp.ContractId != null){
+                newOpp.ContractId = originalOpp.ContractId;
+            }
+            if(originalOpp.ContactId != null){
+                newOpp.ContactId = originalOpp.ContactId;
+            }
+            if(originalOpp.Description != null){
+                newOpp.Description = originalOpp.Description;
+            }
+            if(originalOpp.LeadSource != null){
+                newOpp.LeadSource = originalOpp.LeadSource;
+            }
+            if(originalOpp.NextStep != null){
+                newOpp.NextStep = originalOpp.NextStep;
+            }
+            if(originalOpp.OwnerId != null){
+                newOpp.OwnerId = originalOpp.OwnerId;
+            }
+            if(originalOpp.Pricebook2Id != null){
+                newOpp.Pricebook2Id = originalOpp.Pricebook2Id;
+            }
+            if(originalOpp.CampaignId != null){
+                newOpp.CampaignId = originalOpp.CampaignId;
+            }
+            if(originalOpp.IsPrivate != null){
+                newOpp.isPrivate = originalOpp.isPrivate;
+            }
+            if(originalOpp.Probability != null){
+                newOpp.Probability = originalOpp.Probability;
+            }
+            insert newOpp;
+            }
+            catch(DmlException e){
+                System.debug('The following exception has occurred: ' + e.getMessage());
+            }
+            //Get Opportunity Products
+            List<OpportunityLineItem> newOlis = new List<OpportunityLineItem>();
+            List<OpportunityLineItem> olis = [SELECT Id, Description, ListPrice, Product2Id, ProductCode, Quantity, UnitPrice
+                                                    FROM OpportunityLineItem
+                                                    WHERE OpportunityId =: originalOpp.Id];
+            try{
+                if(olis.size()>0){
+                    for(OpportunityLineItem oli: olis){
+                        OpportunityLineItem newOli = new OpportunityLineItem();
+                        newOli.Discount = 0;
+                        if(newOpp.Id != null){
+                            newOli.OpportunityId = newOpp.Id;
+                        }
+                        if(oli.Description != null){
+                            newOli.Description = oli.Description;
+                        }
+                        if(oli.UnitPrice != null){
+                            newOli.UnitPrice = oli.UnitPrice;
+                        }
+                        if(oli.Quantity != null){
+                            newOli.Quantity = oli.Quantity;
+                        }
+                        if(oli.Product2Id != null){
+                            newOli.Product2Id = oli.Product2Id;
+                        }
+                        newOlis.add(newOli);
+                    }
+                    insert newOlis;
+                }
+            }
+            catch(DmlException e){
+                System.debug('The following exception has occurred: ' + e.getMessage());
+            }
+    	}
+
+    //Get Opportunity Stages        
+    public List<String> getStageNames(){
+       List<String> pickListValuesList= new List<String>();
+		Schema.DescribeFieldResult fieldResult = Opportunity.StageName.getDescribe();
+		List<Schema.PicklistEntry> ple = fieldResult.getPicklistValues();
+		for( Schema.PicklistEntry pickListVal : ple){
+			pickListValuesList.add(pickListVal.getLabel());
+		}     
+		return pickListValuesList;
+    }
+    
+    //Get Opportunity Types       
+    public List<String> getTypeNames(){
+       List<String> pickListValuesList= new List<String>();
+		Schema.DescribeFieldResult fieldResult = Opportunity.Type.getDescribe();
+		List<Schema.PicklistEntry> ple = fieldResult.getPicklistValues();
+		for( Schema.PicklistEntry pickListVal : ple){
+			pickListValuesList.add(pickListVal.getLabel());
+		}     
+		return pickListValuesList;
+    }
+}
